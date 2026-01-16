@@ -102,7 +102,7 @@ function predict() {
     .toUpperCase();
 
     loadStockCSV(sym);
-    fetch("http://127.0.0.1:8000/predict/" + sym)
+    fetch(`http://127.0.0.1:8000/predict/${sym}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -115,6 +115,23 @@ function predict() {
                     " | Predicted: $" + data.predicted_price.toFixed(3);
                 document.getElementById("predictionText").innerText="Result"
                 document.getElementById("predictionText").style="font-size: 1.2em;"
+                document.getElementById("result").innerText =
+                "Last Price: $" + data.last_price.toFixed(3) +
+                " | Predicted: $" + data.predicted_price.toFixed(3);
+
+                document.getElementById("ma100Value").innerText =
+                data.ma100.toFixed(3);
+
+                document.getElementById("rsiValue").innerText =
+                data.rsi.toFixed(2);
+
+                document.getElementById("volumeValue").innerText =
+                data.volume.toLocaleString();
+
+                document.getElementById("volatilityValue").innerText =
+                (data.volatility * 100).toFixed(2) + "%";
+
+
                
             }
         })
