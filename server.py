@@ -7,6 +7,9 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 import requests
 from flask import Flask, jsonify
+from pydantic import BaseModel
+import requests
+
 app = FastAPI()
 
 @app.get("/")
@@ -15,6 +18,7 @@ def home():
 
 app.add_middleware(
     CORSMiddleware,
+    allow_credentials=True,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,3 +77,35 @@ def predict(symbol: str):
         "volume": volume,
         "volatility": float(volatility)
     }
+
+
+# ✅ HARDCODED KEY (ONLY FOR TESTING)
+ONDEMAND_API_KEY = "Tt7U3BN8wFOPT0GC4pbNsjlqPOfLMHII"
+
+ONDEMAND_URL = "https://api.on-demand.io/chat/v1/sessions/query"
+
+class ChatReq(BaseModel):
+    message: str
+
+@app.post("/chat")
+def chat(req: ChatReq):
+    payload = {
+        "query": req.message,
+        "endpointId": "predefined-openai-gpt4.1-nano",
+        "responseMode": "sync"
+    }
+
+    headers = {
+        "apikey": ONDEMAND_API_KEY,
+        "Content-Type": "application/json"
+    }
+
+    r = requests.post(ONDEMAND_URL, json=payload, headers=headers, timeout=30)
+
+    if r.status_code != 200:
+        return {"error": f"OnDemand error {r.status_code}", "details": r.text}
+
+    data = r.json()
+    reply = data.get("data", {}).get("answer", "No reply")
+
+    return {"reply": reply}

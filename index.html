@@ -12,6 +12,8 @@
 
 
 </head>
+<div id="chatbot-root"></div>
+<script type="module" src="/src/chatbot.jsx"></script>
 
 <body>
     <header style="z-index: 999;">
@@ -131,7 +133,6 @@
             <p class="value" id="volatilityValue">--</p>
             <p class="sub">30-day historical </p>
     </section>
-    <script src="script.js"></script>
 
     <section class="news">
         <div id="newsbox">
@@ -144,12 +145,30 @@
             </div>
         </div>
     </section>
+    <section>
+    <button id="chatToggle">💬</button>
+
+<div id="chatWindow" class="chat-hidden">
+  <div id="chatHeader">
+    <span>AlphaStocks Assistant</span>
+    <button id="chatClose">✖</button>
+  </div>
+
+  <div id="chatMessages"></div>
+
+  <div id="chatInputBar">
+    <input id="chatInput" type="text" placeholder="Ask something..." />
+    <button id="chatSend">Send</button>
+  </div>
+</div>
+
+</section>
     <footer>
         <div>
             Made with &#9829; by Team AlphaCoders
         </div>
     </footer>
-
+<script src="script.js"></script>
 </body>
 
 </html>

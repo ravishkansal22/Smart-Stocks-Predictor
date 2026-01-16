@@ -6,7 +6,9 @@ const stocks = [
     "NVDA - NVIDIA",
     "TSLA - Tesla",
     "META - Meta Platforms",
-    "NFLX - Netflix"
+    "NFLX - Netflix",
+    "RS - Reliance",
+    "BLK - BlackRock"
 ];
 const csvMap = {
     GOOGL: "GOOG.csv",
@@ -31,7 +33,9 @@ window.priceChart = new Chart(ctx, {
             data: [],
             borderWidth: 2,
             tension: 0.4,
-            pointRadius: 0
+            pointRadius: 4,
+            pointHoverRadius: 6
+
         }]
     },
     options: {
@@ -96,52 +100,38 @@ document.addEventListener("click", (e) => {
     }
 });
 
-function predict() {
-   let sym = document.getElementById("stockname").value
-    .trim()
-    .toUpperCase();
+async function predict() {
+  let sym = document.getElementById("stockname").value.trim().toUpperCase();
 
-    loadStockCSV(sym);
-    fetch(`http://127.0.0.1:8000/predict/${sym}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                document.getElementById("result").innerText = data.error;
-                document.getElementById("predictionText").innerText=""
-                
-            } else {
-                document.getElementById("result").innerText =
-                    "Last Price: $" + data.last_price.toFixed(3) +
-                    " | Predicted: $" + data.predicted_price.toFixed(3);
-                document.getElementById("predictionText").innerText="Result"
-                document.getElementById("predictionText").style="font-size: 1.2em;"
-                document.getElementById("result").innerText =
-                "Last Price: $" + data.last_price.toFixed(3) +
-                " | Predicted: $" + data.predicted_price.toFixed(3);
+  await loadStockCSV(sym);   // ✅ history
+  await loadLiveOnce(sym);   // ✅ latest live point added
+  loadNews();
 
-                document.getElementById("ma100Value").innerText =
-                data.ma100.toFixed(3);
+  fetch(`http://127.0.0.1:8000/predict/${sym}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById("result").innerText = data.error;
+        document.getElementById("predictionText").innerText = "";
+      } else {
+        document.getElementById("predictionText").innerText = "Result";
 
-                document.getElementById("rsiValue").innerText =
-                data.rsi.toFixed(2);
+        document.getElementById("result").innerText =
+          "Last Price: $" + data.last_price.toFixed(3) +
+          " | Predicted: $" + data.predicted_price.toFixed(3);
 
-                document.getElementById("volumeValue").innerText =
-                data.volume.toLocaleString();
-
-                document.getElementById("volatilityValue").innerText =
-                (data.volatility * 100).toFixed(2) + "%";
-
-
-               
-            }
-        })
-        .catch(err => {
-            document.getElementById("result").innerText = "Server not running";
-            
-            document.getElementById("predictionText").innerText=""
-            document.getElementById("symbolname").innerText=sym
-        });
+        document.getElementById("ma100Value").innerText = data.ma100.toFixed(3);
+        document.getElementById("rsiValue").innerText = data.rsi.toFixed(2);
+        document.getElementById("volumeValue").innerText = data.volume.toLocaleString();
+        document.getElementById("volatilityValue").innerText =
+          (data.volatility * 100).toFixed(2) + "%";
+      }
+    })
+    .catch(() => {
+      document.getElementById("result").innerText = "Server not running";
+    });
 }
+
 
 const popularButtons = document.getElementsByClassName("popbut");
 const stockInput = document.getElementById("stockname");
@@ -234,12 +224,14 @@ const companyMap = {
   MSFT: "MSFT",
   NVDA: "NVDA",
   AMZN: "AMZN",
-  BLK:"BLK,"
+  BLK:"BLK",
+  RS:"RS",
+
 };
 
 function loadNews() {
     document.getElementById("newsbox").style.display = "block";
-  const input = document.getElementById("stockname").value;
+  const input = document.getElementById("stockname").value.toUpperCase();
   const symbol = companyMap[input];
 
   const newsDiv = document.getElementById("news");
@@ -272,3 +264,107 @@ function loadNews() {
       newsDiv.innerHTML = "<p>News service unavailable</p>";
     });
 }
+
+async function loadLiveOnce(sym) {
+  try {
+    const res = await fetch(
+      `https://finnhub.io/api/v1/quote?symbol=${sym}&token=${apiKey}`
+    );
+    const data = await res.json();
+
+    const livePrice = data.c;
+    if (!livePrice) throw new Error("No live price");
+
+    // add live point to existing history
+    const now = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
+
+    window.priceChart.data.labels.push(now);
+    window.priceChart.data.datasets[0].data.push(livePrice);
+
+    // keep last 30 points
+    if (window.priceChart.data.labels.length > 30) {
+      window.priceChart.data.labels.shift();
+      window.priceChart.data.datasets[0].data.shift();
+    }
+
+    window.priceChart.update();
+  } catch (err) {
+    console.log(err);
+  }
+}
+
+// ==========================
+// Chatbot UI + Backend Proxy Call
+// ==========================
+
+const chatToggle = document.getElementById("chatToggle");
+const chatWindow = document.getElementById("chatWindow");
+const chatClose = document.getElementById("chatClose");
+const chatMessages = document.getElementById("chatMessages");
+const chatInput = document.getElementById("chatInput");
+const chatSend = document.getElementById("chatSend");
+
+function addMsg(text, who) {
+  const div = document.createElement("div");
+  div.className = `msg ${who}`;
+  div.textContent = text;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+chatToggle.addEventListener("click", () => {
+  chatWindow.classList.toggle("chat-hidden");
+});
+
+chatClose.addEventListener("click", () => {
+  chatWindow.classList.add("chat-hidden");
+});
+
+async function sendToBot(message) {
+  const res = await fetch("http://127.0.0.1:8000/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data?.error || "Chat server error");
+  }
+
+  return data.reply;
+}
+
+async function handleSend() {
+  const msg = chatInput.value.trim();
+  if (!msg) return;
+
+  chatInput.value = "";
+  addMsg(msg, "user");
+
+  const typing = document.createElement("div");
+  typing.className = "msg bot";
+  typing.textContent = "Typing...";
+  chatMessages.appendChild(typing);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  try {
+    const reply = await sendToBot(msg);
+    typing.remove();
+    addMsg(reply, "bot");
+  } catch (e) {
+    typing.remove();
+    addMsg("Bot is unavailable right now.", "bot");
+    console.error(e);
+  }
+}
+
+chatSend.addEventListener("click", handleSend);
+
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") handleSend();
+});
+
+
+
