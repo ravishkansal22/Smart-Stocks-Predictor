@@ -102,8 +102,7 @@ document.addEventListener("click", (e) => {
 
 async function predict() {
   let sym = document.getElementById("stockname").value.trim().toUpperCase().split(" - ")[0];
-
-
+  document.getElementById("symbolname").innerText = sym;
   await loadStockCSV(sym);
   loadNews();
 
